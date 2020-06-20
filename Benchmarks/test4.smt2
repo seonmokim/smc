@@ -1,0 +1,10 @@
+(set-logic QF_BV)
+(set-info :source |Converted by Dunbo Cai. dunbocai@gmail.com|)
+(set-info :smt-lib-version 2.0)
+(set-info :category "convex body with variables with domain [-15, 15]")
+(declare-fun x_0 () (_ BitVec 8))
+(assert (bvsge x_0 (bvsub (_ bv0 8) (_ bv15 8))) )
+(assert (bvsle x_0 (_ bv15 8)) )
+
+(check-sat)
+(exit)

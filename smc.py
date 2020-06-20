@@ -30,6 +30,12 @@ class Bounds:
         self.sla = sla
         self.sha = sha
         self.vars = vars
+    def printBound(self):
+        print ("Unsigned Lower Bound: " + str(self.ula) + ", " + str(Log2(self.ula)) + " bits")
+        print ("Unsigned Upper Bound: " + str(self.uha) + ", " + str(Log2(self.uha)) + " bits")
+        print ("Signed Lower Bound: " + str(self.sla) + ", " + str(Log2(self.sla)) + " bits")
+        print ("Signed Upper Bound: " + str(self.sha) + ", " + str(Log2(self.sha)) + " bits")
+
 
 def mergeBounds(a, b):
     vars = list(a.vars) + list(set(b.vars) - set(a.vars))
@@ -1482,5 +1488,4 @@ for bound in bounds:
 for i in range(len(bounds)-1):
     bound = mergeBounds(bounds[i], bounds[i+1])
     bounds[i+1] = bound
-
-print(bounds[-1].ula, bounds[-1].uha, bounds[-1].sla, bounds[-1].sha, bounds[-1].vars)
+bounds[-1].printBound()

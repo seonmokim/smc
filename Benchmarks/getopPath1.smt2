@@ -1,0 +1,8 @@
+(set-logic QF_BV)
+(set-info :smt-lib-version 2.0)
+(set-info :status sat)
+(declare-fun c () (_ BitVec 8))
+(assert (not (or (= c #x20) (= c #x09) (= c #x0A))))
+(assert (and (distinct c #x2E) (or (bvult c #x30) (bvugt c #x39))))
+(check-sat)
+(exit)
