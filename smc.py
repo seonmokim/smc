@@ -5,7 +5,7 @@ import re
 import math
 
 class Node:
-    def __init__(self, name, type, width, ul, uh, sl, sh, ulc, uhc, slc, shc, hom, mh, vars):
+    def __init__(self, name, type, width, ul, uh, sl, sh, lc, hc, hom, vars):
         self.name = name
         self.type = type
         self.width = width
@@ -13,106 +13,76 @@ class Node:
         self.uh = uh    # unsigned high
         self.sl = sl    # signed low
         self.sh = sh    # signed high
-        self.ulc = ulc  # unsigned low cardinality
-        self.uhc = uhc  # unsigned high cardinality
-        self.slc = slc  # signed low cardinality
-        self.shc = shc  # signed high cardinality
+        self.lc = slc  # low cardinality
+        self.hc = shc  # high cardinality
         self.hom = hom  # homogeneous
-        self.mh = mh    # masked homogeneous
         self.vars = vars
     def printNode(self):
-        print (self.name, self.type, self.width, self.ul, self.uh, self.sl, self.sh, self.ulc, self.uhc, self.slc, self.shc, self.hom, self.mh, self.vars)
+        print (self.name, self.type, self.width, self.ul, self.uh, self.sl, self.sh, self.lc, self.hc, self.hom, self.vars)
 
 class Bounds:
-    def __init__(self, ula, uha, sla, sha, vars):
-        self.ula = ula
-        self.uha = uha
-        self.sla = sla
-        self.sha = sha
+    def __init__(self, la, ha, vars):
+        self.la = ula
+        self.ha = uha
         self.vars = vars
     def printBound(self):
-        print ("Unsigned Lower Bound: " + str(self.ula) + ", " + str(Log2(self.ula)) + " bits")
-        print ("Unsigned Upper Bound: " + str(self.uha) + ", " + str(Log2(self.uha)) + " bits")
-        print ("Signed Lower Bound: " + str(self.sla) + ", " + str(Log2(self.sla)) + " bits")
-        print ("Signed Upper Bound: " + str(self.sha) + ", " + str(Log2(self.sha)) + " bits")
-
+        print ("Lower Bound: " + str(self.la) + ", " + str(log2(self.la)) + " bits")
+        print ("Upper Bound: " + str(self.ha) + ", " + str(log2(self.ha)) + " bits")
 
 def mergeBounds(a, b):
     vars = list(a.vars) + list(set(b.vars) - set(a.vars))
+    inter_vars = list(set(a.vars) - (set(a.vars) - set(b.vars)))
+    width = 1
+    for var in inter_vars:
+        width = width * getNode(var).width
+    inter_max = min(2**width, math.gcd(int(a.uha), int(b.uha)))
+    inter_min = min(2**width, math.gcd(int(a.ula), int(b.ula)))
     ula = uha = sla = sha = 1
     if not (set(a.vars).isdisjoint(b.vars)):
         if set(a.vars) == set(b.vars):
-            if (a.ula < b.ula and a.uha < b.uha) or (a.ula > b.ula and a.uha > b.uha) :
-                ula = min(a.ula, b.ula)
-                uha = min(a.uha, b.uha)
+            if (a.la < b.la and a.ha < b.ha) or (a.la > b.la and a.ha > b.ha) :
+                la = min(a.la, b.la)
+                ha = min(a.ha, b.ha)
             else:
-                ula = max(a.ula, b.ula)
-                uha = min(a.uha, b.uha)
-            if (a.sla < b.sla and a.sha < b.sha) or (a.sla > b.sla and a.sha > b.sha) :
-                sla = min(a.sla, b.sla)
-                sha = min(a.sha, b.sha)
-            else:
-                sla = max(a.sla, b.sla)
-                sha = min(a.sha, b.sha)
+                la = max(a.la, b.la)
+                ha = min(a.ha, b.ha)
         elif set(a.vars).issubset(set(b.vars)):
-            ula = b.ula
-            uha = b.uha
-            sla = b.sla
-            sha = b.sha
+            la = b.la
+            ha = b.ha
         elif set(b.vars).issubset(set(a.vars)):
-            ula = a.ula
-            uha = a.uha
-            sla = a.sla
-            sha = a.sha
+            la = a.la
+            ha = a.ha
         else:
-            ula = max(a.ula, b.ula)
-            uha = a.uha * b.uha
-            sla = max(a.sla, b.sla)
-            sha = a.sha * b.sha
+            la = a.la * b.la / inter_min
+            ha = a.ha * b.ha / inter_max
     else:
-        ula = a.ula * b.ula
-        uha = a.uha * b.uha
-        sla = a.sla * b.sla
-        sha = a.sha * b.sha
-    return Bounds(ula, uha, sla, sha, vars)
+        la = a.la * b.la
+        ha = a.ha * b.ha
+    return Bounds(la, ha, vars)
 
-def getULA(f, g):
+def getLA(f, g):
     vars = list(f.vars) + list(set(g.vars) - set(f.vars))
-    ula = 1
+    la = 1
     for var in vars:
-        ula = ula * getNode(var).ulc
-    return ula
-def getUHA(f, g):
+        la = la * getNode(var).lc
+    return la
+def getHA(f, g):
     vars = list(f.vars) + list(set(g.vars) - set(f.vars))
-    uha = 1
+    ha = 1
     for var in vars:
-        uha = uha * getNode(var).uhc
-    return uha
-def getSLA(f, g):
-    vars = list(f.vars) + list(set(g.vars) - set(f.vars))
-    sla = 1
-    for var in vars:
-        sla = sla * getNode(var).slc
-    return sla
-def getSHA(f, g):
-    vars = list(f.vars) + list(set(g.vars) - set(f.vars))
-    sha = 1
-    for var in vars:
-        sha = sha * getNode(var).shc
-    return sha
+        ha = ha * getNode(var).hc
+    return ha
 
 def isPermutation(f):
-    return f.ulc == pow(2, f.width) and len(f.vars) == 1
+    return f.lc == pow(2, f.width) and len(f.vars) == 1
 def isConstant(f):
     return f.type == 'bvconst' or f.ul == f.uh or f.sl == f.sh
 def isCommon(f, g):
     return (not set(f.vars).isdisjoint(g.vars))
 def isPowerOfTwo(n):
-    return (math.ceil(Log2(n)) == math.floor(Log2(n)))
-def isOddU(f):
-    return f.ul % 2 == 1 and isConstant(f)
-def isOddS(f):
-    return f.sl % 2 == 1 and isConstant(f)
+    return (math.ceil(log2(n)) == math.floor(log2(n)))
+def isOdd(f):
+    return f.ul % 2 != 0 and isConstant(f)
 def isVars(name):
     global nodes
     for node in nodes:
@@ -162,47 +132,36 @@ def input_bits(f, g):
     return f.width * len(f.vars) + g.width * len(list(set(g.vars) - set(f.vars)))
 def input_count(f, g):
     return 2**input_bits(f, g)
-def ldU(f):
+def ld(f):
     if f.hom:
-        return input_count(f, f)/ f.uhc
+        return input_count(f, f)/ f.hc
     else:
         return 1
-def hdU(f):
+def hd(f):
     if f.hom:
-        return input_count(f, f) / f.ulc
+        return input_count(f, f) / f.lc
     else:
-        return input_count(f, f) - f.ulc + 1
-def ldS(f):
-    if f.hom:
-        return input_count(f, f)/ f.shc
-    else:
-        return 1
-def hdS(f):
-    if f.hom:
-        return input_count(f, f) / f.slc
-    else:
-        return input_count(f, f) - f.slc + 1
+        return input_count(f, f) - f.lc + 1
     
-def Log2(x): 
+def log2(x):
     if x == 0:
         raise Exception('%f should not be zero', x)
-  
     return math.log10(x)/math.log10(2)
 
 def getNode(name):
     global nodes, temps
-    if re.search(r'\#x([0-9a-f]+)', name):
-        match = re.search(r'\#x([0-9a-f]+)', name)
+    if re.search(r'\#x([0-9a-fA-F]+)', name):
+        match = re.search(r'\#x([0-9a-fA-F]+)', name)
         width = len(match.group(1)) * 4
         unsigned_num = int(match.group(1), 16)
         signed_num = bits_to_signed(match.group(1),16)
-        return Node(name, 'bvconst', width, unsigned_num, unsigned_num, signed_num, signed_num, 1, 1, 1, 1, True, True, [])
+        return Node(name, 'bvconst', width, unsigned_num, unsigned_num, signed_num, signed_num, 1, 1, True, [])
     elif re.search(r'\#b[0-1]+', name):
         match = re.search(r'\#b([0-1]+)', name)
         width = len(match.group(1))
         unsigned_num = int(match.group(1), 2)
         signed_num = bits_to_signed(match.group(1),2)
-        return Node(name, 'bvconst', width, unsigned_num, unsigned_num, signed_num, signed_num, 1, 1, 1, 1, True, True, [])
+        return Node(name, 'bvconst', width, unsigned_num, unsigned_num, signed_num, signed_num, 1, 1, True, [])
     elif re.search(r'temp([0-9]+)', name):
         for node in temps:
             #print(node.name, node.type)
@@ -225,12 +184,12 @@ def eq_tok(var1, var2, cnt):
     
     vars = list(f.vars) + list(set(g.vars) - set(f.vars))
     if isConstant(f) and isConstant(g) and f.ul == g.ul:
-        return Node('temp'+str(cnt), 'bveq_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+        return Node('temp'+str(cnt), 'bveq_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
     if isCommon(f, g):
         ula = uha = sla = sha = input_bits(f, g)
 
         bounds.append(Bounds(ula, uha, sla, sha, vars))
-        return Node('temp'+str(cnt), 'bveq_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+        return Node('temp'+str(cnt), 'bveq_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
     leq = max(f.ul, g.ul)
     heq = min(f.uh, g.uh)
     minlhit = f.ulc - max(f.uh - heq, leq - f.ul)
@@ -239,11 +198,11 @@ def eq_tok(var1, var2, cnt):
     minrhit = min(minrhit, heq - leq + 1)
     inter = max(1, minlhit + minrhit - (heq - leq + 1))
     ic = input_count(f, g)
-    ula = max(1, min(inter * ldU(f) * ldU(g), ic))
-    uha = min(inter * hdU(f) * hdU(g), ic)
+    ula = max(1, min(inter * ld(f) * ld(g), ic))
+    uha = min(inter * hd(f) * hd(g), ic)
 
     bounds.append(Bounds(ula, uha, ula, uha, vars))
-    return Node('temp'+str(cnt), 'bveq_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+    return Node('temp'+str(cnt), 'bveq_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
 
 def noteq_tok(parse, cnt):
     f = getNode(getNode(parse[1]).vars[0])
@@ -260,19 +219,142 @@ def noteq_tok(parse, cnt):
         ula = sla = 0
         uha = sha = 0
         bounds.append(Bounds(ula, uha, sla, sha, vars))
-        return Node('temp'+str(cnt), 'bvnoteq_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, vars)
+        return Node('temp'+str(cnt), 'bvnoteq_op', f.width, 0, 0, 0, 0, 1, 1, True, vars)
     if isCommon(f, g):
         ula = uha = sla = sha = input_bits(f, g)
         bounds.append(Bounds(ula, uha, sla, sha, vars))
-        return Node('temp'+str(cnt), 'bvnoteq_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, vars)
+        return Node('temp'+str(cnt), 'bvnoteq_op', f.width, 0, 0, 0, 0, 1, 1, True, vars)
     leq = max(f.ul, g.ul)
     heq = min(f.uh, g.uh)
-    ula = max(1, input_count(f, g) - (heq - leq + 1) * hdU(f) * hdU(g))
+    ula = max(1, input_count(f, g) - (heq - leq + 1) * hd(f) * hd(g))
+    uha = input_count(f, g)
+    sla = ula
+    sha = uha
+    f.ulc = f.ulc - 1
+    f.uhc = f.uhc - 1
+    f.slc = f.slc - 1
+    f.shc = f.shc - 1
+    g.ulc = g.ulc - 1
+    g.uhc = g.uhc - 1
+    g.slc = g.slc - 1
+    g.shc = g.shc - 1
+    f.hom = False
+    g.hom = False
+    bounds.append(Bounds(ula, uha, sla, sha, vars))
+    return Node('temp'+str(cnt), 'bvnoteq_op', f.width, 0, 0, 0, 0, 1, 1, True, vars)
+
+def distinct_tok(var1, var2, cnt):
+    f = getNode(var1)
+    g = getNode(var2)
+    if (f.width != g.width):
+        raise Exception('Width must match')
+
+    if isConstant(f) and isConstant(g) and f.ul == g.ul:
+        raise Exception('unsatisfiable')
+
+    vars = list(f.vars) + list(set(g.vars) - set(f.vars))
+    if f.uh < g.ul or g.uh < f.ul:
+        ula = sla = 0
+        uha = sha = 0
+        bounds.append(Bounds(ula, uha, sla, sha, vars))
+        return Node('temp'+str(cnt), 'distinct_op', f.width, 0, 0, 0, 0, 1, 1, True, vars)
+    if isCommon(f, g):
+        ula = uha = sla = sha = input_bits(f, g)
+        bounds.append(Bounds(ula, uha, sla, sha, vars))
+        return Node('temp'+str(cnt), 'distinct_op', f.width, 0, 0, 0, 0, 1, 1, True, vars)
+    leq = max(f.ul, g.ul)
+    heq = min(f.uh, g.uh)
+    ula = max(1, input_count(f, g) - (heq - leq + 1) * hd(f) * hd(g))
+    uha = input_count(f, g)
+    sla = ula
+    sha = uha
+    f.ulc = f.ulc - 1
+    f.uhc = f.uhc - 1
+    f.slc = f.slc - 1
+    f.shc = f.shc - 1
+    g.ulc = g.ulc - 1
+    g.uhc = g.uhc - 1
+    g.slc = g.slc - 1
+    g.shc = g.shc - 1
+    f.hom = False
+    g.hom = False
+    bounds.append(Bounds(ula, uha, sla, sha, vars))
+    return Node('temp'+str(cnt), 'distinct_op', f.width, 0, 0, 0, 0, 1, 1, True, vars)
+
+def bvule_tok(var1, var2, cnt):
+    f = getNode(var1)
+    g = getNode(var2)
+    if (f.width != g.width):
+        raise Exception('Width must match')
+    global isUnsigned, isSigned
+    if f.ul >= g.uh:
+        isUnsigned = False
+        print ('Unsigned representation unsatisfiable')
+    if f.sl >= g.sh:
+        isSigned = False
+        print ('Signed representation unsatisfiable')
+     
+    vars = list(f.vars) + list(set(g.vars) - set(f.vars))
+    if f.uh < g.ul:
+        ula = f.ulc * g.ulc
+        sla = f.slc * g.slc
+        uha = f.uhc * g.uhc
+        sha = f.shc * g.shc
+        bounds.append(Bounds(ula, uha, sla, sha, vars))
+        return Node('temp'+str(cnt), 'bvule_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
+    wcRange = g.ul - (f.uh - f.ulc + 1)
+    if wcRange >= 1:
+        accepted = min(wcRange*ld(f), input_count(f, f))
+    elif isCommon(f, g):
+        accepted = 1
+    else:
+        accepted = ld(f)
+    
+    ula = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
     uha = input_count(f, g)
     sla = ula
     sha = uha
     bounds.append(Bounds(ula, uha, sla, sha, vars))
-    return Node('temp'+str(cnt), 'bvnoteq_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, vars)
+
+    if isConstant(g) and f.uh > g.ul:
+        f.uh = g.ul
+
+    return Node('temp'+str(cnt), 'bvule_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
+
+def bvuge_tok(var1, var2, cnt):
+    f = getNode(var1)
+    g = getNode(var2)
+    if (f.width != g.width):
+        raise Exception('Width must match')
+    global isUnsigned, isSigned
+    if f.uh <= g.ul:
+        isUnsigned = False
+        print ('Unsigned representation unsatisfiable')
+    if f.sh <= g.sl:
+        isSigned = False
+        print ('Unsigned representation unsatisfiable')
+    
+    vars = list(f.vars) + list(set(g.vars) - set(f.vars))
+    if f.ul > g.uh:
+        ula = sla = 0
+        uha = sha = 0
+        bounds.append(Bounds(ula, uha, sla, sha, vars))
+        return Node('temp'+str(cnt), 'bvuge_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
+    wcRange = f.ul + f.ulc - g.uh - 1
+    if wcRange >= 1:
+        accepted = min(wcRange*ld(f), input_count(f, f))
+    elif isCommon(f, g):
+        accepted = 1
+    else:
+        accepted = ld(f)
+    
+    ula = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
+    uha = input_count(f, g)
+    sla = ula
+    sha = uha
+    bounds.append(Bounds(ula, uha, sla, sha, vars))
+
+    return Node('temp'+str(cnt), 'bvuge_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
 
 def bvult_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -294,14 +376,14 @@ def bvult_tok(var1, var2, cnt):
         uha = f.uhc * g.uhc
         sha = f.shc * g.shc
         bounds.append(Bounds(ula, uha, sla, sha, vars))
-        return Node('temp'+str(cnt), 'bvult_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+        return Node('temp'+str(cnt), 'bvult_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
     wcRange = g.ul - (f.uh - f.ulc + 1)
     if wcRange >= 1:
-        accepted = min(wcRange*ldU(f), input_count(f, f))
+        accepted = min(wcRange*ld(f), input_count(f, f))
     elif isCommon(f, g):
         accepted = 1
     else:
-        accepted = ldU(f)
+        accepted = ld(f)
     
     ula = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
     uha = input_count(f, g)
@@ -312,7 +394,7 @@ def bvult_tok(var1, var2, cnt):
     if isConstant(g) and f.uh > g.ul:
         f.uh = g.ul
 
-    return Node('temp'+str(cnt), 'bvult_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+    return Node('temp'+str(cnt), 'bvult_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
 
 def bvugt_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -332,14 +414,14 @@ def bvugt_tok(var1, var2, cnt):
         ula = sla = 0
         uha = sha = 0
         bounds.append(Bounds(ula, uha, sla, sha, vars))
-        return Node('temp'+str(cnt), 'bvugt_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+        return Node('temp'+str(cnt), 'bvugt_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
     wcRange = f.ul + f.ulc - g.uh - 1
     if wcRange >= 1:
-        accepted = min(wcRange*ldU(f), input_count(f, f))
+        accepted = min(wcRange*ld(f), input_count(f, f))
     elif isCommon(f, g):
         accepted = 1
     else:
-        accepted = ldU(f)
+        accepted = ld(f)
     
     ula = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
     uha = input_count(f, g)
@@ -347,7 +429,7 @@ def bvugt_tok(var1, var2, cnt):
     sha = uha
     bounds.append(Bounds(ula, uha, sla, sha, vars))
 
-    return Node('temp'+str(cnt), 'bvugt_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+    return Node('temp'+str(cnt), 'bvugt_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
 
 def bvslt_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -365,7 +447,7 @@ def bvslt_tok(var1, var2, cnt):
     vars = list(f.vars) + list(set(g.vars) - set(f.vars))
     
     if isConstant(f) and isConstant(g):
-        return Node('temp'+str(cnt), 'bvslt_op', f.width, 0, 0, 0, 0, 0, 0, 0, 0, True, True, [f.name, g.name])
+        return Node('temp'+str(cnt), 'bvslt_op', f.width, 0, 0, 0, 0, 0, 0,  True, [f.name, g.name])
     elif isConstant(f):
         uc = f.uh
         if g.uh > uc:
@@ -415,11 +497,11 @@ def bvslt_tok(var1, var2, cnt):
         else:
             wcRange = g.ul - (f.uh - f.ulc)
             if wcRange >= 1:
-                accepted = min(wcRange*ldU(f), input_count(f, f))
+                accepted = min(wcRange*ld(f), input_count(f, f))
             elif isCommon(f, g):
                 accepted = 1
             else:
-                accepted = ldU(f)
+                accepted = ld(f)
         
             ula = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
         
@@ -429,11 +511,11 @@ def bvslt_tok(var1, var2, cnt):
         else:
             wcRange = g.sl - (f.sh - f.slc)
             if wcRange >= 1:
-                accepted = min(wcRange*ldS(f), input_count(f, f))
+                accepted = min(wcRange*ld(f), input_count(f, f))
             elif isCommon(f, g):
                 accepted = 1
             else:
-                accepted = ldS(f)
+                accepted = ld(f)
     
             sla = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
 
@@ -441,7 +523,7 @@ def bvslt_tok(var1, var2, cnt):
     sha = getSHA(f, g)
     bounds.append(Bounds(ula, uha, sla, sha, vars))
 
-    return Node('temp'+str(cnt), 'bvslt_op', f.width, 0, 0, 0, 0, ula, uha, sla, sha, True, True, [f.name, g.name])
+    return Node('temp'+str(cnt), 'bvslt_op', f.width, 0, 0, 0, 0, la, ha, True, [f.name, g.name])
 
 def bvsgt_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -459,7 +541,7 @@ def bvsgt_tok(var1, var2, cnt):
     vars = list(f.vars) + list(set(g.vars) - set(f.vars))
 
     if isConstant(f) and isConstant(g):
-        return Node('temp'+str(cnt), 'bvsgt_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+        return Node('temp'+str(cnt), 'bvsgt_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
     elif isConstant(f):
         uc = f.uh
         if g.ul < uc:
@@ -509,11 +591,11 @@ def bvsgt_tok(var1, var2, cnt):
         else:
             wcRange = f.ul - (g.uh - f.ulc)
             if wcRange >= 1:
-                accepted = min(wcRange*ldU(f), input_count(f, f))
+                accepted = min(wcRange*ld(f), input_count(f, f))
             elif isCommon(f, g):
                 accepted = 1
             else:
-                accepted = ldU(f)
+                accepted = ld(f)
         
             ula = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
 
@@ -523,11 +605,11 @@ def bvsgt_tok(var1, var2, cnt):
         else:
             wcRange = f.sl - (g.sh - f.slc)
             if wcRange >= 1:
-                accepted = min(wcRange*ldS(f), input_count(f, f))
+                accepted = min(wcRange*ld(f), input_count(f, f))
             elif isCommon(f, g):
                 accepted = 1
             else:
-                accepted = ldS(f)
+                accepted = ld(f)
         
             sla = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
 
@@ -535,7 +617,7 @@ def bvsgt_tok(var1, var2, cnt):
     sha = getSHA(f, g)
     bounds.append(Bounds(ula, uha, sla, sha, vars))
 
-    return Node('temp'+str(cnt), 'bvsgt_op', f.width, 0, 0, 0, 0, ula, uha, sla, sha, True, True, [f.name, g.name])
+    return Node('temp'+str(cnt), 'bvsgt_op', f.width, 0, 0, 0, 0, la, ha, True, [f.name, g.name])
 
 def bvsle_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -553,7 +635,7 @@ def bvsle_tok(var1, var2, cnt):
     vars = list(f.vars) + list(set(g.vars) - set(f.vars))
     
     if isConstant(f) and isConstant(g):
-        return Node('temp'+str(cnt), 'bvsle_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+        return Node('temp'+str(cnt), 'bvsle_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
     elif isConstant(f):
         uc = f.uh
         if g.uh > uc:
@@ -598,30 +680,30 @@ def bvsle_tok(var1, var2, cnt):
         sla = f.slc
     else:
         if f.uh <= g.ul:
-            ula = getULA(f, g)
-            uha = getUHA(f, g)
+            ula = getLA(f, g)
+            uha = getHA(f, g)
         else:
             wcRange = g.ul - (f.uh - f.ulc)
             if wcRange >= 1:
-                accepted = min(wcRange*ldU(f), input_count(f, f))
+                accepted = min(wcRange*ld(f), input_count(f, f))
             elif isCommon(f, g):
                 accepted = 1
             else:
-                accepted = ldU(f)
+                accepted = ld(f)
         
             ula = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
         
         if f.sh <= g.sl :
-            sla = getULA(f, g)
-            sha = getUHA(f, g)
+            sla = getLA(f, g)
+            sha = getHA(f, g)
         else:
             wcRange = g.sl - (f.sh - f.slc)
             if wcRange >= 1:
-                accepted = min(wcRange*ldS(f), input_count(f, f))
+                accepted = min(wcRange*ld(f), input_count(f, f))
             elif isCommon(f, g):
                 accepted = 1
             else:
-                accepted = ldS(f)
+                accepted = ld(f)
     
             sla = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
 
@@ -629,7 +711,7 @@ def bvsle_tok(var1, var2, cnt):
     sha = getSHA(f, g)
     bounds.append(Bounds(ula, uha, sla, sha, vars))
 
-    return Node('temp'+str(cnt), 'bvsle_op', f.width, 0, 0, 0, 0, ula, uha, sla, sha, True, True, [f.name, g.name])
+    return Node('temp'+str(cnt), 'bvsle_op', f.width, 0, 0, 0, 0, la, ha, True, [f.name, g.name])
 
 def bvsge_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -647,7 +729,7 @@ def bvsge_tok(var1, var2, cnt):
     vars = list(f.vars) + list(set(g.vars) - set(f.vars))
 
     if isConstant(f) and isConstant(g):
-        return Node('temp'+str(cnt), 'bvsge_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+        return Node('temp'+str(cnt), 'bvsge_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
     elif isConstant(f):
         uc = f.uh
         if g.ul < uc:
@@ -697,11 +779,11 @@ def bvsge_tok(var1, var2, cnt):
         else:
             wcRange = f.ul - (g.uh - f.ulc)
             if wcRange >= 1:
-                accepted = min(wcRange*ldU(f), input_count(f, f))
+                accepted = min(wcRange*ld(f), input_count(f, f))
             elif isCommon(f, g):
                 accepted = 1
             else:
-                accepted = ldU(f)
+                accepted = ld(f)
         
             ula = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
 
@@ -711,11 +793,11 @@ def bvsge_tok(var1, var2, cnt):
         else:
             wcRange = f.sl - (g.sh - f.slc)
             if wcRange >= 1:
-                accepted = min(wcRange*ldS(f), input_count(f, f))
+                accepted = min(wcRange*ld(f), input_count(f, f))
             elif isCommon(f, g):
                 accepted = 1
             else:
-                accepted = ldS(f)
+                accepted = ld(f)
         
             sla = accepted * pow(2, g.width * len(list(set(g.vars) - set(f.vars))))
 
@@ -723,7 +805,7 @@ def bvsge_tok(var1, var2, cnt):
     sha = getSHA(f, g)
     bounds.append(Bounds(ula, uha, sla, sha, vars))
 
-    return Node('temp'+str(cnt), 'bvsge_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, [f.name, g.name])
+    return Node('temp'+str(cnt), 'bvsge_op', f.width, 0, 0, 0, 0, 1, 1, True, [f.name, g.name])
 
 def bvadd_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -773,7 +855,7 @@ def bvadd_tok(var1, var2, cnt):
         slc = shc
     hom = (f.hom and isConstant(g)) or (isConstant(f) and g.hom) or (not isCommon(f,g) and isPermutation(f) and isPermutation(g)) or mh
 
-    return Node('temp'+str(cnt), 'bvadd_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, hom, mh, vars)
+    return Node('temp'+str(cnt), 'bvadd_op', f.width, ul, uh, sl, sh, lc, hc, hom, vars)
 
 def bvsubtract_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -823,7 +905,7 @@ def bvsubtract_tok(var1, var2, cnt):
         slc = shc
     hom = (f.hom and isConstant(g)) or (isConstant(f) and g.hom) or (not isCommon(f,g) and isPermutation(f) and isPermutation(g)) or mh
 
-    return Node('temp'+str(cnt), 'bvsubtract_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, hom, mh, vars)
+    return Node('temp'+str(cnt), 'bvsubtract_op', f.width, ul, uh, sl, sh, lc, hc, hom, vars)
 
 def bvmultiply_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -876,7 +958,7 @@ def bvmultiply_tok(var1, var2, cnt):
 
     hom = f.hom and isConstant(g) and isOddU(g)
 
-    return Node('temp'+str(cnt), 'bvmultiply_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, hom, mh, vars)
+    return Node('temp'+str(cnt), 'bvmultiply_op', f.width, ul, uh, sl, sh, lc, hc, hom, vars)
 
 def bvsdiv_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -924,7 +1006,7 @@ def bvsdiv_tok(var1, var2, cnt):
 
     hom = f.hom and isConstant(g) and isOddS(g)
 
-    return Node('temp'+str(cnt), 'bvsdiv_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, hom, mh, vars)
+    return Node('temp'+str(cnt), 'bvsdiv_op', f.width, ul, uh, sl, sh, lc, hc, hom, vars)
 
 def bvudiv_tok(var1, var2,  cnt):
     f = getNode(var1)
@@ -972,7 +1054,44 @@ def bvudiv_tok(var1, var2,  cnt):
 
     hom = f.hom and isConstant(g) and isOddU(g)
 
-    return Node('temp'+str(cnt), 'bvudiv_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, hom, mh, vars)
+    return Node('temp'+str(cnt), 'bvudiv_op', f.width, ul, uh, sl, sh, lc, hc, hom, vars)
+
+def not_tok(var, cnt):
+    f = getNode(var)
+    if (f.width != g.width):
+        raise Exception('Width must match')
+
+    vars = list(f.vars) + list(set(g.vars) - set(f.vars))
+
+    if isConstant(f) and isConstant(g):
+        return Node('temp'+str(cnt), 'and_op', f.width, ul, uh, sl, sh, lc, hc, hom, vars)
+
+    uh = min(f.uh, g.uh)
+    ul = 0
+    max_newrange = pow(2, maxNumOfBitsSetU(g))
+    min_newrange = pow(2, minNumOfBitsSetU(g))
+    max_d = pow(2, f.width) / min_newrange
+
+    if isConstant(g):
+        uhc = min(f.uhc, max_newrange)
+    else:
+        uhc = min(f.uhc * g.uhc, pow(2, f.width))
+
+    if not isCommon(f, g) and max_d < f.ulc:
+        ulc = int(f.ulc / max_d)
+    else:
+        ulc = 1
+
+    mh = (f.mh and isConstant(g)) or (g.mh and isConstant(f))
+
+    ### Signed abstracion not implemented yet
+    sl = -pow(2, f.width - 1)
+    sh = pow(2, f.width - 1) - 1
+    slc = ulc
+    shc = uhc
+    ###
+
+    return Node('temp'+str(cnt), 'not_op', f.width, ul, uh, sl, sh, lc, hc, mh, vars)
 
 def and_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -981,9 +1100,6 @@ def and_tok(var1, var2, cnt):
         raise Exception('Width must match')
     
     vars = list(f.vars) + list(set(g.vars) - set(f.vars))
-
-    if isConstant(f) and isConstant(g):
-        return Node('temp'+str(cnt), 'and_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, mh, mh, vars)
     
     uh = min(f.uh, g.uh)
     ul = 0
@@ -1010,9 +1126,16 @@ def and_tok(var1, var2, cnt):
     shc = uhc
     ###
 
-    return Node('temp'+str(cnt), 'and_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, mh, mh, vars)
+    return Node('temp'+str(cnt), 'and_op', f.width, ul, uh, sl, sh, lc, hc, mh, vars)
 
 def or_tok(var1, var2, cnt):
+    a = bounds[-1]
+    bounds.pop()
+    b = bounds[-1]
+    bounds.pop()
+    vars = list(a.vars) + list(set(b.vars) - set(a.vars))
+    bounds.append(Bounds(a.ula+b.ula, a.uha+b.uha, a.sla+b.sla, a.sha+b.sha, vars))
+    
     f = getNode(var1)
     g = getNode(var2)
     if (f.width != g.width):
@@ -1046,7 +1169,7 @@ def or_tok(var1, var2, cnt):
     shc = uhc
     ###
 
-    return Node('temp'+str(cnt), 'or_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, mh, mh, vars)
+    return Node('temp'+str(cnt), 'or_op', f.width, ul, uh, sl, sh, ulc, uhc, mh, vars)
 
 def bvand_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -1057,7 +1180,7 @@ def bvand_tok(var1, var2, cnt):
     vars = list(f.vars) + list(set(g.vars) - set(f.vars))
 
     if isConstant(f) and isConstant(g):
-        return Node('temp'+str(cnt), 'bvand_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, mh, mh, vars)
+        return Node('temp'+str(cnt), 'bvand_op', f.width, ul, uh, sl, sh, lc, hc, mh, vars)
     
     uh = min(f.uh, g.uh)
     ul = 0
@@ -1084,7 +1207,7 @@ def bvand_tok(var1, var2, cnt):
     shc = uhc
     ###
 
-    return Node('temp'+str(cnt), 'bvand_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, mh, mh, vars)
+    return Node('temp'+str(cnt), 'bvand_op', f.width, ul, uh, sl, sh, lc, hc, mh, vars)
 
 def bvor_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -1120,7 +1243,7 @@ def bvor_tok(var1, var2, cnt):
     shc = uhc
     ###
 
-    return Node('temp'+str(cnt), 'bvor_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, mh, mh, vars)
+    return Node('temp'+str(cnt), 'bvor_op', f.width, ul, uh, sl, sh, lc, hc, mh, mh, vars)
 
 def bvxor_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -1138,7 +1261,7 @@ def bvxor_tok(var1, var2, cnt):
         sl = -pow(2, width - 1)
         sh = pow(2, width - 1) - 1
  
-        return Node('temp'+str(cnt), 'bvxor_op', f.width, ul, uh, sl, sh, f.ulc, f.uhc, f.slc, f.shc, f.hom, f.mh, vars)
+        return Node('temp'+str(cnt), 'bvxor_op', f.width, ul, uh, sl, sh, f.lc, f.hc, f.hom, vars)
 
     if not isCommon(f, g):
         ulc = max(f.ulc, g.ulc)
@@ -1155,7 +1278,7 @@ def bvxor_tok(var1, var2, cnt):
     shc = uhc
     ###
  
-    return Node('temp'+str(cnt), 'bvxor_op', f.width, 0, pow(2, f.width)-1, sl, sh, ulc, uhc, slc, shc, hom, False, vars)
+    return Node('temp'+str(cnt), 'bvxor_op', f.width, 0, pow(2, f.width)-1, sl, sh, lc, hc, hom, vars)
 
 def bvshiftl_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -1168,9 +1291,9 @@ def bvshiftl_tok(var1, var2, cnt):
     if not isConstant(g):
         umax = pow(2, f.width)
         smax = pow(2, f.width-1)
-        return Node('temp'+str(cnt), 'bvshiftl_op', f.width, 0, umax-1, -(smax), smax-1, 1, umax, 1, umax, False, False, vars)
+        return Node('temp'+str(cnt), 'bvshiftl_op', f.width, 0, umax-1, -(smax), smax-1, 1, umax, False, vars)
     if g.ul >= f.width:
-        return Node('temp'+str(cnt), 'bvshiftl_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, vars)
+        return Node('temp'+str(cnt), 'bvshiftl_op', f.width, 0, 0, 0, 0, 1, 1, True, vars)
     uh = f.uh << g.ul
     if f.uh * pow(2, g.ul) > pow(2, f.width - 1):
         ul = 0
@@ -1194,7 +1317,7 @@ def bvshiftl_tok(var1, var2, cnt):
     shc = uhc
     ###
  
-    return Node('temp'+str(cnt), 'bvshiftl_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, hom, mh, vars)
+    return Node('temp'+str(cnt), 'bvshiftl_op', f.width, ul, uh, sl, sh, lc, hc, hom, vars)
 
 def bvshiftr_tok(var1, var2, cnt):
     f = getNode(var1)
@@ -1207,9 +1330,9 @@ def bvshiftr_tok(var1, var2, cnt):
     if not isConstant(g):
         umax = pow(2, f.width)
         smax = pow(2, f.width-1)
-        return Node('temp'+str(cnt), 'bvshiftr_op', f.width, 0, umax-1, -(smax), smax-1, 1, umax, 1, umax, False, False, vars)
+        return Node('temp'+str(cnt), 'bvshiftr_op', f.width, 0, umax-1, -(smax), smax-1, 1, umax, False, vars)
     if pow(2, g.ul) > f.uh:   
-        return Node('temp'+str(cnt), 'bvshiftr_op', f.width, 0, 0, 0, 0, 1, 1, 1, 1, True, True, vars)
+        return Node('temp'+str(cnt), 'bvshiftr_op', f.width, 0, 0, 0, 0, 1, 1, True, vars)
     uh = f.uh >> g.ul
     ul = f.ul >> g.ul
     hom = f.mh & (pow(2, g.ul) <= f.ul)
@@ -1230,7 +1353,7 @@ def bvshiftr_tok(var1, var2, cnt):
     shc = uhc
     ###
  
-    return Node('temp'+str(cnt), 'bvshiftr_op', f.width, ul, uh, sl, sh, ulc, uhc, slc, shc, hom, mh, vars)
+    return Node('temp'+str(cnt), 'bvshiftr_op', f.width, ul, uh, sl, sh, lc, hc, hom, vars)
 
 def concat_tok(var1, var2, cnt):
 
@@ -1252,7 +1375,7 @@ def concat_tok(var1, var2, cnt):
     shc = uhc
     ###
  
-    return Node('temp'+str(cnt), 'bvconcat_op', width, ul, uh, sl, sh, ulc, uhc, slc, shc, mh, mh, vars)
+    return Node('temp'+str(cnt), 'bvconcat_op', width, ul, uh, sl, sh, lc, hc, mh, vars)
 
 def extract_tok(parse, cnt):
     f = getNode(parse[3])
@@ -1290,7 +1413,7 @@ def extract_tok(parse, cnt):
     shc = uhc
     ###
     
-    return Node('temp'+str(cnt), 'bvextract_op', width, ul, uh, sl, sh, ulc, uhc, slc, shc, f.mh, f.mh, f.vars)
+    return Node('temp'+str(cnt), 'bvextract_op', width, ul, uh, sl, sh, lc, hc, f.mh, f.vars)
 
 def sign_extend_tok(parse, cnt):
     
@@ -1298,7 +1421,7 @@ def sign_extend_tok(parse, cnt):
     
     width = int(parse[1]) + f.width
     
-    return Node('temp'+str(cnt), 'bvsign_extend_op', width, f.ul, f.uh, f.sl, f.sh, f.ulc, f.uhc, f.slc, f.shc, f.hom, f.mh, f.vars)
+    return Node('temp'+str(cnt), 'bvsign_extend_op', width, f.ul, f.uh, f.sl, f.sh, f.lc, f.hc, f.hom, f.vars)
 
 def summary(parse):
     global temps, tmp_cnt
@@ -1309,11 +1432,17 @@ def summary(parse):
         node = eq_tok(parse[1], parse[2], tmp_cnt)
     elif parse[0] == 'not':
         if getNode(parse[1]).type == 'bveq_op':
-            node = noteq_tok(parse)
+            node = noteq_tok(parse, tmp_cnt)
+        else:
+            node = not_tok(parse, tmp_cnt)
     elif parse[0] == 'bvult':
-        node = bvult_tok(parse[1], parse[2], tmp_cnt)
+        node = bvslt_tok(parse[1], parse[2], tmp_cnt)
     elif parse[0] == 'bvugt':
-        node = bvugt_tok(parse[1], parse[2], tmp_cnt)
+        node = bvsgt_tok(parse[1], parse[2], tmp_cnt)
+    elif parse[0] == 'bvule':
+        node = bvsle_tok(parse[1], parse[2], tmp_cnt)
+    elif parse[0] == 'bvuge':
+        node = bvsge_tok(parse[1], parse[2], tmp_cnt)
     elif parse[0] == 'bvslt':
         node = bvslt_tok(parse[1], parse[2], tmp_cnt)
     elif parse[0] == 'bvsgt':
@@ -1322,6 +1451,8 @@ def summary(parse):
         node = bvsle_tok(parse[1], parse[2], tmp_cnt)
     elif parse[0] == 'bvsge':
         node = bvsge_tok(parse[1], parse[2], tmp_cnt)
+    elif parse[0] == 'distinct':
+        node = distinct_tok(parse[1], parse[2], tmp_cnt)
     elif parse[0] == 'and':
         for i in range(num_vars-1):
             node = and_tok(parse[i+1], parse[i+2], tmp_cnt)
@@ -1329,7 +1460,6 @@ def summary(parse):
             if i != num_vars-2:
                 tmp_cnt += 1
             parse[i+2] = node.name
-
     elif parse[0] == 'or':
         for i in range(num_vars-1):
             node = or_tok(parse[i+1], parse[i+2], tmp_cnt)
@@ -1392,7 +1522,7 @@ def summary(parse):
         if re.search(r'bv([0-9]+)', parse[1]):
             match = re.search(r'bv([0-9]+)', parse[1])
             num = int(match.group(1))
-            node = Node('temp'+str(tmp_cnt), 'bvconst', int(parse[2]), num, num, num, num, 1, 1, 1, 1, True, True, [])
+            node = Node('temp'+str(tmp_cnt), 'bvconst', int(parse[2]), num, num, num, num, 1, 1, True, [])
         else:
             node = 2
     elif parse[0] == 'assert':
@@ -1456,7 +1586,7 @@ def main():
             width = int(node_desc[9])
             umax = pow(2, width)
             smax = pow(2, width-1)
-            nodes.append(Node(node_desc[2], node_desc[8], width, 0, umax-1, -(smax), smax-1, umax, umax, umax, umax, True, True, [node_desc[2]]))
+            nodes.append(Node(node_desc[2], node_desc[8], width, 0, umax-1, -(smax), smax-1, umax, umax, True, [node_desc[2]]))
             #nodes[node_desc[2]] = {'type': node_desc[8], 'width': width, 'ul': 0, 'uh': umax-1, 'sl': -(smax), 'sh': smax-1, 'ulc': umax, 'uhc': umax,'slc': umax, 'shc': umax, 'hom': True, 'hm': True, 'vars': [] }
         line = file.readline()
         lines.append(line)
