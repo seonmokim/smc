@@ -11,7 +11,7 @@ SMC is a structural approximate model counting algorithm to compute the lower an
 ## Usage
 
 ```
-$ python smc.py test.smt2
+$ python3 smc.py test.smt2
 ```
 
 ## Contacts
